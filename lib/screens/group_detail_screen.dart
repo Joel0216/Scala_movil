@@ -55,7 +55,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     final success = await data.saveAttendance(asistencias);
     if (success) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Asistencia guardada')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Clase terminada y asistencia guardada')));
       }
     }
   }
@@ -119,7 +119,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('GUARDAR ASISTENCIA'),
+                  child: const Text('TERMINAR CLASE'),
                 ),
               ),
             ],

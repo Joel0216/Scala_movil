@@ -2,7 +2,7 @@ enum EstadoAsistencia { asistencia, falta, retardo }
 
 class Asistencia {
   final int? id;
-  final int grupoId;
+  final String grupoId;
   final int alumnoId;
   final String fecha;
   final EstadoAsistencia estado;
@@ -22,8 +22,9 @@ class Asistencia {
       'grupo_id': grupoId,
       'alumno_id': alumnoId,
       'fecha': fecha,
-      'estado': estado.name,
-      'observaciones': observaciones,
+      'estado': estado.name.toUpperCase(),
+      'asistio': estado != EstadoAsistencia.falta,
+      'observaciones': observaciones ?? '',
     };
   }
 }

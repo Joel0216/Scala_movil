@@ -120,6 +120,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
                   },
                 ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/verify');
+                  },
+                  child: const Text(
+                    '¿Primera vez? Verifica tu cuenta y crea tu contraseña',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
               ],
             ),
           ),

@@ -7,6 +7,8 @@ import 'providers/data_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/groups_screen.dart';
 import 'screens/group_detail_screen.dart';
+import 'screens/verification_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +51,8 @@ class ScalaApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/groups': (context) => const GroupsScreen(),
         '/group-detail': (context) => const GroupDetailScreen(),
+        '/verify': (context) => const VerificationScreen(),
+        '/settings': (context) => const SettingsScreen(),
       },
     );
   }

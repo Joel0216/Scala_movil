@@ -32,12 +32,33 @@ class SupabaseService {
     await client.auth.signOut();
   }
 
+  // Teacher Verification and Registration
+  Future<String> verifyMaestroStatus(String email) async {
+    final response = await client
+        .from('maestros')
+        .select('id, activo')
+        .eq('email', email)
+        .maybeSingle();
+    
+    if (response == null || response['activo'] != true) return 'NOT_FOUND';
+    return 'OK';
+  }
+
+  Future<AuthResponse> signUpMaestro(String email, String password) async {
+    final response = await client.auth.signUp(email: email, password: password);
+    return response;
+  }
+
+  Future<void> updatePassword(String newPassword) async {
+    await client.auth.updateUser(UserAttributes(password: newPassword));
+  }
+
   // Teacher Profile
-  Future<Maestro?> getMaestroProfile(String authId) async {
+  Future<Maestro?> getMaestroProfile(String email) async {
     final response = await client
         .from('maestros')
         .select()
-        .eq('auth_id', authId)
+        .eq('email', email)
         .maybeSingle();
     
     if (response == null) return null;
@@ -48,14 +69,14 @@ class SupabaseService {
   Future<List<Grupo>> getMaestroGrupos(int maestroId) async {
     final response = await client
         .from('grupos')
-        .select('*, cursos(nombre)')
+        .select('*, cursos(curso)')
         .eq('maestro_id', maestroId);
     
     return (response as List).map((json) => Grupo.fromJson(json)).toList();
   }
 
   // Students in Group
-  Future<List<Alumno>> getGrupoAlumnos(int grupoId) async {
+  Future<List<Alumno>> getGrupoAlumnos(String grupoId) async {
     final response = await client
         .from('alumno_grupos')
         .select('alumnos(*)')

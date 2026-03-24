@@ -1,0 +1,20 @@
+{
+  "id": "6bb3a95e-f7ed-4a2f-8fcf-80ee581f2a7d",
+  "clave": "BE3AKCLU16",
+  "curso_id": 10,
+  "maestro_id": 2,
+  "dia": "LU",
+  "hora_entrada": "16:45",
+  "hora_salida": "17:45",
+  "fecha_inicio": "2026-03-18",
+  "salon": null,
+  "cupo": 4,
+  "alumnos_inscritos": 1,
+  "leccion_actual": null,
+  "fecha_leccion": null,
+  "activo": true,
+  "razon_borrado": null,
+  "created_at": "2026-03-15T21:45:23.971878+00:00",
+  "tipo_pago_maestro": "ALUMNO",
+  "salon_id": "2"
+}

@@ -25,7 +25,7 @@ class DataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadAlumnos(int grupoId) async {
+  Future<void> loadAlumnos(String grupoId) async {
     _isLoading = true;
     notifyListeners();
     _alumnos = await _service.getGrupoAlumnos(grupoId);
@@ -33,7 +33,7 @@ class DataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> startClassSession(int grupoId, int maestroId) async {
+  Future<bool> startClassSession(String grupoId, int maestroId) async {
     try {
       final now = DateTime.now();
       final sesion = Sesion(

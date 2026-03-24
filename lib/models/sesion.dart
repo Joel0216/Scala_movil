@@ -1,6 +1,6 @@
 class Sesion {
   final int? id;
-  final int grupoId;
+  final String grupoId;
   final int maestroId;
   final String fecha;
   final String horaInicio;
