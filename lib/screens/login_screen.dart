@@ -14,22 +14,31 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   Future<void> _handleLogin() async {
-    final auth = context.read<AuthProvider>();
-    final success = await auth.login(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-    );
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
-    if (success) {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/groups');
-      }
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresa tu correo y contraseña')),
+      );
+      return;
+    }
+
+    final auth = context.read<AuthProvider>();
+    final error = await auth.login(email, password);
+
+    if (!mounted) return;
+
+    if (error.isEmpty) {
+      Navigator.pushReplacementNamed(context, '/groups');
     } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error de autenticación')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          duration: const Duration(seconds: 4),
+          backgroundColor: Colors.red.shade800,
+        ),
+      );
     }
   }
 

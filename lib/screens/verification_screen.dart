@@ -10,16 +10,31 @@ class VerificationScreen extends StatefulWidget {
 }
 
 class _VerificationScreenState extends State<VerificationScreen> {
+  final _claveController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isVerified = false;
 
   Future<void> _handleVerify() async {
+    final clave = _claveController.text.trim();
     final email = _emailController.text.trim();
-    if (email.isEmpty) return;
+
+    if (clave.isEmpty || email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor ingresa tu clave y correo electrónico')),
+      );
+      return;
+    }
+
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Correo inválido. Asegúrate de no usar comas (,) en lugar de puntos (.)')),
+      );
+      return;
+    }
 
     final auth = context.read<AuthProvider>();
-    final status = await auth.verifyTeacher(email);
+    final status = await auth.verifyTeacher(clave, email);
 
     if (!mounted) return;
 
@@ -28,15 +43,15 @@ class _VerificationScreenState extends State<VerificationScreen> {
         _isVerified = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cuenta verificada. Por favor, crea una contraseña.')),
+        const SnackBar(content: Text('Verificado. Ahora crea tu contraseña.')),
       );
-    } else if (status == 'ALREADY_VERIFIED') {
+    } else if (status == 'EMAIL_MISMATCH') {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Esta cuenta ya fue verificada. Inicia sesión directamente.')),
+        const SnackBar(content: Text('Esta clave ya tiene un correo diferente asignado. Contacta al administrador.')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Correo no encontrado o el maestro está inactivo')),
+        const SnackBar(content: Text('Clave no encontrada o el maestro está inactivo')),
       );
     }
   }
@@ -57,18 +72,44 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
     if (mounted) {
       if (result == 'OK') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cuenta creada con éxito. Ahora puedes iniciar sesión.')),
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('¡Cuenta creada!'),
+            content: const Text(
+              'Tu cuenta fue creada exitosamente.\n\n'
+              'Si Supabase tiene la confirmación de email activada, revisa tu bandeja de entrada y confirma tu correo antes de iniciar sesión.\n\n'
+              'Si no recibes el correo, ya puedes intentar iniciar sesión directamente.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
         );
-        Navigator.pop(context);
       } else if (result == 'ALREADY_REGISTERED') {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Esta cuenta ya fue verificada. Inicia sesión directamente.')),
+          const SnackBar(content: Text('Esta cuenta ya existe. Inicia sesión directamente.')),
         );
         Navigator.pop(context);
+      } else if (result == 'RATE_LIMIT') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Demasiados intentos. Espera unos minutos e intenta de nuevo.')),
+        );
+      } else if (result.startsWith('AUTH_ERROR: ')) {
+        final errorMsg = result.replaceFirst('AUTH_ERROR: ', '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $errorMsg')),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al crear la cuenta. Verifique sus datos o intente más tarde.')),
+          const SnackBar(content: Text('Error al crear la cuenta. Intenta más tarde.')),
         );
       }
     }
@@ -99,17 +140,34 @@ class _VerificationScreenState extends State<VerificationScreen> {
               const SizedBox(height: 48),
               if (!_isVerified) ...[
                 const Text(
-                  'Ingresa tu correo electrónico registrado para verificar tu cuenta en el sistema.',
+                  'Ingresa tu clave de maestro y tu correo electrónico para registrarte en el sistema.',
                   style: TextStyle(color: Colors.white70, fontSize: 16),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
                 TextField(
+                  controller: _claveController,
+                  style: const TextStyle(color: Colors.white),
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    hintText: 'Clave de Maestro (ej: AZ1)',
+                    hintStyle: const TextStyle(color: Colors.white60),
+                    prefixIcon: const Icon(Icons.badge, color: Colors.white70),
+                    filled: true,
+                    fillColor: Colors.white10,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
                   controller: _emailController,
                   style: const TextStyle(color: Colors.white),
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
-                    hintText: 'Correo Electrónico',
+                    hintText: 'Tu Correo Electrónico',
                     hintStyle: const TextStyle(color: Colors.white60),
                     prefixIcon: const Icon(Icons.email, color: Colors.white70),
                     filled: true,
@@ -144,7 +202,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 ),
               ] else ...[
                 const Text(
-                  'Crea una contraseña segura para tu cuenta. La usarás junto con tu correo para iniciar sesión.',
+                  'Crea una contraseña para tu cuenta. La usarás junto con tu correo para iniciar sesión.',
                   style: TextStyle(color: Colors.white70, fontSize: 16),
                   textAlign: TextAlign.center,
                 ),
@@ -169,7 +227,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   obscureText: true,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    hintText: 'Nueva Contraseña',
+                    hintText: 'Nueva Contraseña (mínimo 6 caracteres)',
                     hintStyle: const TextStyle(color: Colors.white60),
                     prefixIcon: const Icon(Icons.lock, color: Colors.white70),
                     filled: true,
@@ -197,7 +255,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                         ),
                         child: auth.isLoading
                             ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text('REGISTRAR', style: TextStyle(fontWeight: FontWeight.bold)),
+                            : const Text('CREAR CUENTA', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     );
                   },

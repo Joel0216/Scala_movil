@@ -18,13 +18,21 @@ class Asistencia {
   });
 
   Map<String, dynamic> toJson() {
+    String finalObservaciones = observaciones ?? '';
+    if (estado == EstadoAsistencia.retardo) {
+      if (finalObservaciones.isNotEmpty) {
+        finalObservaciones = 'RETARDO - $finalObservaciones';
+      } else {
+        finalObservaciones = 'RETARDO';
+      }
+    }
+
     return {
       'grupo_id': grupoId,
       'alumno_id': alumnoId,
       'fecha': fecha,
-      'estado': estado.name.toUpperCase(),
       'asistio': estado != EstadoAsistencia.falta,
-      'observaciones': observaciones ?? '',
+      'observaciones': finalObservaciones,
     };
   }
 }
