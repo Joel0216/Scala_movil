@@ -384,14 +384,28 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   ButtonSegment(value: EstadoAsistencia.asistencia, label: Text('A')),
                   ButtonSegment(value: EstadoAsistencia.falta, label: Text('F')),
                   ButtonSegment(value: EstadoAsistencia.retardo, label: Text('R')),
+                  ButtonSegment(value: EstadoAsistencia.reposicion, label: Text('Rep')),
                 ],
                 selected: {currentStatus},
                 onSelectionChanged: (Set<EstadoAsistencia> selection) {
                   setState(() => _attendance[alumno.id] = selection.first);
                 },
                 showSelectedIcon: false,
-                style: const ButtonStyle(
+                style: ButtonStyle(
                   visualDensity: VisualDensity.compact,
+                  backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      if (currentStatus == EstadoAsistencia.reposicion) return Colors.purple;
+                      if (currentStatus == EstadoAsistencia.falta) return Colors.red;
+                      if (currentStatus == EstadoAsistencia.retardo) return Colors.orange;
+                      return Colors.blue.shade800;
+                    }
+                    return null;
+                  }),
+                  foregroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                    if (states.contains(WidgetState.selected)) return Colors.white;
+                    return null;
+                  }),
                 ),
               ),
             ],

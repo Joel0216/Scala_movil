@@ -1,4 +1,4 @@
-enum EstadoAsistencia { asistencia, falta, retardo }
+enum EstadoAsistencia { asistencia, falta, retardo, reposicion }
 
 class Asistencia {
   final int? id;
@@ -18,20 +18,26 @@ class Asistencia {
   });
 
   Map<String, dynamic> toJson() {
-    String finalObservaciones = observaciones ?? '';
+    String obs = observaciones ?? '';
+    
+    // Limpieza: eliminar prefijos anteriores para evitar duplicados o conflictos
+    // Busca "RETARDO - ", "REPOSICIÓN - ", o las palabras solas
+    obs = obs.replaceAll(RegExp(r'^(RETARDO|REPOSICIÓN) - ', caseSensitive: false), '');
+    obs = obs.replaceAll(RegExp(r'^(RETARDO|REPOSICIÓN)$', caseSensitive: false), '');
+    obs = obs.trim();
+
+    String finalObservaciones = obs;
     if (estado == EstadoAsistencia.retardo) {
-      if (finalObservaciones.isNotEmpty) {
-        finalObservaciones = 'RETARDO - $finalObservaciones';
-      } else {
-        finalObservaciones = 'RETARDO';
-      }
+      finalObservaciones = obs.isNotEmpty ? 'RETARDO - $obs' : 'RETARDO';
+    } else if (estado == EstadoAsistencia.reposicion) {
+      finalObservaciones = obs.isNotEmpty ? 'REPOSICIÓN - $obs' : 'REPOSICIÓN';
     }
 
     return {
       'grupo_id': grupoId,
       'alumno_id': alumnoId,
       'fecha': fecha,
-      'asistio': estado != EstadoAsistencia.falta,
+      'asistio': estado != EstadoAsistencia.falta, // Reposición cuenta como asistencia
       'observaciones': finalObservaciones,
     };
   }
