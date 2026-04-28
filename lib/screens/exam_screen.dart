@@ -372,16 +372,29 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
     WidgetsBinding.instance.addPostFrameCallback((_) => _cargarAlumnos());
   }
 
+  bool _isNotificationsInitialized = false;
+
   void _initNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
-    const settings = InitializationSettings(android: androidSettings);
-    await flutterLocalNotificationsPlugin.initialize(settings: settings);
+    try {
+      const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
+      const settings = InitializationSettings(android: androidSettings);
+      await flutterLocalNotificationsPlugin.initialize(settings);
+      _isNotificationsInitialized = true;
+    } catch (e) {
+      debugPrint('Error inicializando notificaciones: $e');
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    flutterLocalNotificationsPlugin.cancelAll();
+    if (_isNotificationsInitialized) {
+      try {
+        flutterLocalNotificationsPlugin.cancelAll();
+      } catch (e) {
+        debugPrint('Error al cancelar notificaciones: $e');
+      }
+    }
     _timer?.cancel();
     super.dispose();
   }
@@ -395,7 +408,11 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
       _showNotification();
     } else if (state == AppLifecycleState.resumed) {
       // Cancelar notificacion y recalcular timer
-      flutterLocalNotificationsPlugin.cancelAll();
+      try {
+        flutterLocalNotificationsPlugin.cancelAll();
+      } catch (e) {
+        debugPrint('Error al cancelar notificaciones: $e');
+      }
       _syncTimer();
     }
   }

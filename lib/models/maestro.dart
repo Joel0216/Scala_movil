@@ -3,12 +3,14 @@ class Maestro {
   final String nombre;
   final String email;
   final String? clave;
+  final String? organizacionId;
 
   Maestro({
     required this.id,
     required this.nombre,
     required this.email,
     this.clave,
+    this.organizacionId,
   });
 
   factory Maestro.fromJson(Map<String, dynamic> json) {
@@ -17,6 +19,7 @@ class Maestro {
       nombre: json['nombre'],
       email: json['email'],
       clave: json['clave']?.toString(),
+      organizacionId: json['organizacion_id']?.toString(),
     );
   }
 
@@ -26,6 +29,7 @@ class Maestro {
       'nombre': nombre,
       'email': email,
       'clave': clave,
+      'organizacion_id': organizacionId,
     };
   }
 }

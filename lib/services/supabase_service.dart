@@ -8,6 +8,12 @@ import '../models/examen_programado.dart';
 
 class SupabaseService {
   final SupabaseClient client = Supabase.instance.client;
+  String? _organizacionId;
+
+  // Establecer organizacionId al hacer login
+  void setOrganizacionId(String? orgId) {
+    _organizacionId = orgId;
+  }
 
   // Auth
   Future<AuthResponse> signIn(String emailOrClave, String password) async {
@@ -31,6 +37,7 @@ class SupabaseService {
   }
 
   Future<void> signOut() async {
+    _organizacionId = null;
     await client.auth.signOut();
   }
 
@@ -86,38 +93,54 @@ class SupabaseService {
   Future<Maestro?> getMaestroProfile(String email) async {
     final response = await client
         .from('maestros')
-        .select('id, nombre, email, clave')
+        .select('id, nombre, email, clave, organizacion_id')
         .ilike('email', email.trim())
         .limit(1)
         .maybeSingle();
 
     if (response == null) return null;
-    return Maestro.fromJson(response);
+    final maestro = Maestro.fromJson(response);
+    if (maestro.organizacionId != null) {
+      setOrganizacionId(maestro.organizacionId);
+    }
+    return maestro;
   }
 
   // Groups
   Future<List<Grupo>> getMaestroGrupos(int maestroId) async {
-    final response = await client
+    var query = client
         .from('grupos')
         .select('*, cursos(curso)')
         .eq('maestro_id', maestroId);
+        
+    if (_organizacionId != null) {
+      query = query.eq('organizacion_id', _organizacionId!);
+    }
+
+    final response = await query;
 
     return (response as List).map((json) => Grupo.fromJson(json)).toList();
   }
 
   // Salones
   Future<List<String>> getSalonesNumeros() async {
-    final response = await client.from('salones').select('numero').eq('activo', true);
+    var query = client.from('salones').select('numero').eq('activo', true);
+    if (_organizacionId != null) {
+      query = query.eq('organizacion_id', _organizacionId!);
+    }
+    final response = await query;
     return (response as List).map((e) => e['numero'].toString()).toList();
   }
 
   // Students in Group
   Future<List<Alumno>> getGrupoAlumnos(String grupoClave) async {
-    final response = await client
+    var query = client
         .from('alumno_grupos')
         .select('alumnos(*)')
         .eq('grupo_clave', grupoClave)
         .eq('estado', 'Activo');
+
+    final response = await query;
 
     final List<Alumno> alumnos = [];
     final Set<int> added = {};
@@ -135,7 +158,11 @@ class SupabaseService {
 
   // Sessions
   Future<void> startSession(Sesion sesion) async {
-    await client.from('sesiones_clase').insert(sesion.toJson());
+    final data = sesion.toJson();
+    if (_organizacionId != null) {
+      data['organizacion_id'] = _organizacionId;
+    }
+    await client.from('sesiones_clase').insert(data);
   }
 
   Future<bool> checkSessionExistsThisWeek(String grupoId, DateTime date) async {
@@ -146,12 +173,18 @@ class SupabaseService {
     final String mondayStr = monday.toIso8601String().split('T')[0];
     final String sundayStr = sunday.toIso8601String().split('T')[0];
 
-    final response = await client
+    var query = client
         .from('sesiones_clase')
         .select('id')
         .eq('grupo_id', grupoId)
         .gte('fecha', mondayStr)
         .lte('fecha', sundayStr);
+
+    if (_organizacionId != null) {
+      query = query.eq('organizacion_id', _organizacionId!);
+    }
+
+    final response = await query;
 
     return (response as List).isNotEmpty;
   }
@@ -170,7 +203,17 @@ class SupabaseService {
 
   // Attendance
   Future<void> saveAttendance(List<Asistencia> asistencias) async {
-    final data = asistencias.map((a) => a.toJson()).toList();
+    final data = asistencias.map((a) {
+      final json = a.toJson();
+      if (_organizacionId != null) {
+        json['organizacion_id'] = _organizacionId;
+      }
+      // REGLA: Si es REPOSICIÓN, las observaciones NO pueden estar vacías
+      if (json['tipo'] == 'REPOSICIÓN' && (json['observaciones'] == null || json['observaciones'].toString().trim().isEmpty)) {
+        json['observaciones'] = 'Reposición de clase registrada desde la app';
+      }
+      return json;
+    }).toList();
     await client.from('asistencias').upsert(data, onConflict: 'grupo_id, alumno_id, fecha').select();
   }
 
@@ -180,7 +223,7 @@ class SupabaseService {
 
   /// Devuelve los exámenes donde el maestro es base, examinador1 o examinador2
   Future<List<ExamenProgramado>> getExamenesMaestro(int maestroId) async {
-    final response = await client
+    var query = client
         .from('programacion_examenes')
         .select('''
           id,
@@ -196,8 +239,13 @@ class SupabaseService {
           examinador2_id,
           grupos(clave, cursos(curso))
         ''')
-        .or('maestro_base_id.eq.$maestroId,examinador1_id.eq.$maestroId,examinador2_id.eq.$maestroId')
-        .order('fecha', ascending: false);
+        .or('maestro_base_id.eq.$maestroId,examinador1_id.eq.$maestroId,examinador2_id.eq.$maestroId');
+
+    if (_organizacionId != null) {
+      query = query.eq('organizacion_id', _organizacionId!);
+    }
+
+    final response = await query.order('fecha', ascending: false);
 
     // Deduplicar por clave_examen
     final set = <String>{};
@@ -214,21 +262,24 @@ class SupabaseService {
 
   /// Cuenta las sesiones registradas para un grupo
   Future<int> contarSesionesGrupo(String grupoId) async {
-    final response = await client
+    var query = client
         .from('sesiones_clase')
         .select('id')
         .eq('grupo_id', grupoId);
+    if (_organizacionId != null) query = query.eq('organizacion_id', _organizacionId!);
+    final response = await query;
     return (response as List).length;
   }
 
   /// Obtiene la clave de acceso de un examen (solo si el maestro es base)
   Future<String?> obtenerClaveAcceso(String claveExamen, int maestroId) async {
-    final response = await client
+    var query = client
         .from('programacion_examenes')
         .select('clave_acceso')
         .eq('clave_examen', claveExamen)
-        .eq('maestro_base_id', maestroId)
-        .maybeSingle();
+        .eq('maestro_base_id', maestroId);
+    if (_organizacionId != null) query = query.eq('organizacion_id', _organizacionId!);
+    final response = await query.maybeSingle();
     return response?['clave_acceso'] as String?;
   }
 
@@ -245,11 +296,12 @@ class SupabaseService {
 
   /// Busca un examen por su clave de acceso
   Future<ExamenProgramado?> getExamenPorClaveAcceso(String claveAcceso) async {
-    final response = await client
+    var query = client
         .from('programacion_examenes')
         .select('*, grupos(clave, cursos(curso))')
-        .eq('clave_acceso', claveAcceso)
-        .maybeSingle();
+        .eq('clave_acceso', claveAcceso);
+    if (_organizacionId != null) query = query.eq('organizacion_id', _organizacionId!);
+    final response = await query.maybeSingle();
     
     if (response == null) return null;
     return ExamenProgramado.fromJson(response);
@@ -269,11 +321,14 @@ class SupabaseService {
 
     if (alumnoIds.isEmpty) return [];
 
-    final result = await client
+    var queryAlumnos = client
         .from('alumnos')
         .select('id, nombre, credencial')
         .inFilter('id', alumnoIds)
         .eq('activo', true);
+    if (_organizacionId != null) queryAlumnos = queryAlumnos.eq('organizacion_id', _organizacionId!);
+
+    final result = await queryAlumnos;
 
     return (result as List).map((e) => e as Map<String, dynamic>).toList();
   }
@@ -295,16 +350,22 @@ class SupabaseService {
     required List<ResultadoExamen> resultados,
   }) async {
     final ahora = DateTime.now().toUtc().toIso8601String();
-    final data = resultados.map((r) => {
-      'clave_examen': claveExamen,
-      'alumno_id': r.alumnoId,
-      'presento': r.presento,
-      'aprobo': r.aprobo,
-      'calificacion': r.calificacion,
-      'nota': r.nota,
-      'maestro_calificador_id': maestroCalificadorId,
-      'credencial_maestro': credencialMaestro,
-      'hora_calificacion': ahora,
+    final data = resultados.map((r) {
+      final json = {
+        'clave_examen': claveExamen,
+        'alumno_id': r.alumnoId,
+        'presento': r.presento,
+        'aprobo': r.aprobo,
+        'calificacion': r.calificacion,
+        'nota': r.nota,
+        'maestro_calificador_id': maestroCalificadorId,
+        'credencial_maestro': credencialMaestro,
+        'hora_calificacion': ahora,
+      };
+      if (_organizacionId != null) {
+        json['organizacion_id'] = _organizacionId!;
+      }
+      return json;
     }).toList();
     await client.from('resultados_examen').upsert(data, onConflict: 'clave_examen,alumno_id');
   }
