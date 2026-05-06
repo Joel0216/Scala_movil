@@ -31,6 +31,20 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // 1. Resolve email if it's a clave
+      final resolvedEmail = await _service.resolveEmail(email.trim());
+      
+      // 2. Fetch profile BEFORE signing in (uses anon key)
+      // This bypasses potential RLS issues for authenticated users
+      _maestro = await _service.getMaestroProfile(resolvedEmail);
+
+      if (_maestro == null) {
+        _isLoading = false;
+        notifyListeners();
+        return 'Tu correo no tiene un perfil de maestro asignado. Contacta al administrador.';
+      }
+
+      // 3. Sign in
       final response = await _service.signIn(email.trim(), password.trim());
 
       if (response.user == null) {
@@ -39,16 +53,8 @@ class AuthProvider extends ChangeNotifier {
         return 'No se pudo iniciar sesión. Verifica tus datos.';
       }
 
-      final authedEmail = response.user!.email!;
-      _maestro = await _service.getMaestroProfile(authedEmail);
 
-      if (_maestro == null) {
-        // El usuario existe en Auth pero no en la tabla maestros
-        await _service.signOut();
-        _isLoading = false;
-        notifyListeners();
-        return 'Tu correo no tiene un perfil de maestro asignado. Contacta al administrador.';
-      }
+
 
       _isLoading = false;
       notifyListeners();

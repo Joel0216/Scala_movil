@@ -26,9 +26,21 @@ class _VerificationScreenState extends State<VerificationScreen> {
       return;
     }
 
+    // Smart Check: Detectar si el usuario intercambió los campos
+    if (clave.contains('@') && !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Parece que intercambiaste los campos. Pon tu CLAVE arriba y tu CORREO abajo.'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 5),
+        ),
+      );
+      return;
+    }
+
     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Correo inválido. Asegúrate de no usar comas (,) en lugar de puntos (.)')),
+        const SnackBar(content: Text('Correo inválido. Asegúrate de que el campo de abajo tenga un formato de email (ej: maestro@gmail.com)')),
       );
       return;
     }
@@ -51,7 +63,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clave no encontrada o el maestro está inactivo')),
+        const SnackBar(content: Text('Clave no encontrada.')),
       );
     }
   }
@@ -140,7 +152,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
               const SizedBox(height: 48),
               if (!_isVerified) ...[
                 const Text(
-                  'Ingresa tu clave de maestro y tu correo electrónico para registrarte en el sistema.',
+                  '1. Ingresa tu clave de maestro\n2. Ingresa tu correo electrónico',
                   style: TextStyle(color: Colors.white70, fontSize: 16),
                   textAlign: TextAlign.center,
                 ),
@@ -150,9 +162,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   style: const TextStyle(color: Colors.white),
                   textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(
-                    hintText: 'Clave de Maestro (ej: AZ1)',
-                    hintStyle: const TextStyle(color: Colors.white60),
-                    prefixIcon: const Icon(Icons.badge, color: Colors.white70),
+                    labelText: 'CLAVE DE MAESTRO',
+                    labelStyle: const TextStyle(color: Colors.white70),
+                    hintText: 'Ejemplo: 42',
+                    hintStyle: const TextStyle(color: Colors.white30),
+                    prefixIcon: const Icon(Icons.person, color: Colors.white70),
                     filled: true,
                     fillColor: Colors.white10,
                     border: OutlineInputBorder(
@@ -167,8 +181,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   style: const TextStyle(color: Colors.white),
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
-                    hintText: 'Tu Correo Electrónico',
-                    hintStyle: const TextStyle(color: Colors.white60),
+                    labelText: 'CORREO ELECTRÓNICO',
+                    labelStyle: const TextStyle(color: Colors.white70),
+                    hintText: 'Ejemplo: prueba@gmail.com',
+                    hintStyle: const TextStyle(color: Colors.white30),
                     prefixIcon: const Icon(Icons.email, color: Colors.white70),
                     filled: true,
                     fillColor: Colors.white10,

@@ -53,7 +53,7 @@ class DataProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadGrupos(int maestroId) async {
+  Future<void> loadGrupos(String maestroId) async {
     _isLoading = true;
     notifyListeners();
     _grupos = await _service.getMaestroGrupos(maestroId);
@@ -69,7 +69,7 @@ class DataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadExamenes(int maestroId) async {
+  Future<void> loadExamenes(String maestroId) async {
     _isLoading = true;
     notifyListeners();
     try {
@@ -91,7 +91,7 @@ class DataProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> obtenerClaveAcceso(String claveExamen, int maestroId) async {
+  Future<String?> obtenerClaveAcceso(String claveExamen, String maestroId) async {
     try {
       return await _service.obtenerClaveAcceso(claveExamen, maestroId);
     } catch (e) {
@@ -138,7 +138,7 @@ class DataProvider extends ChangeNotifier {
 
   Future<String> guardarResultadosExamen({
     required String claveExamen,
-    required int maestroCalificadorId,
+    required String maestroCalificadorId,
     required String credencialMaestro,
     required List<ResultadoExamen> resultados,
   }) async {

@@ -2,7 +2,7 @@ class Grupo {
   final String id;
   final String nombre;
   final String? clave;
-  final int? maestroId;
+  final String? maestroId;
   final String? horario;
   final String? salon;
   final String? curso;
@@ -27,7 +27,7 @@ class Grupo {
     
     return Grupo(
       id: json['id'].toString(), // Es un UUID
-      nombre: cursoName.isNotEmpty ? cursoName : (json['nombre'] ?? 'Grupo S/N'),
+      nombre: cursoName.isNotEmpty ? cursoName : (json['nombre'] != null && json['nombre'] != '' && json['nombre'] != 'Grupo S/N' ? json['nombre'] : 'Grupo ${json['clave']}'),
       clave: json['clave'],
       maestroId: json['maestro_id'],
       horario: json['horario'],

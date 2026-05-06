@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/maestro.dart';
 import '../models/grupo.dart';
@@ -16,6 +17,19 @@ class SupabaseService {
   }
 
   // Auth
+  Future<String> resolveEmail(String emailOrClave) async {
+    if (emailOrClave.contains('@')) return emailOrClave;
+
+    final response = await client
+        .from('maestros')
+        .select('email')
+        .or('clave.eq.$emailOrClave,nombre.ilike.%$emailOrClave%')
+        .limit(1)
+        .maybeSingle();
+
+    return response?['email'] ?? emailOrClave;
+  }
+
   Future<AuthResponse> signIn(String emailOrClave, String password) async {
     String email = emailOrClave;
 
@@ -55,7 +69,6 @@ class SupabaseService {
         .maybeSingle();
 
     if (response == null) return 'NOT_FOUND';
-    if (response['activo'] != true) return 'NOT_FOUND';
 
     final existingEmail = response['email'];
     final maestroId = response['id'];
@@ -82,6 +95,15 @@ class SupabaseService {
 
   Future<AuthResponse> signUpMaestro(String email, String password) async {
     final response = await client.auth.signUp(email: email, password: password);
+    
+    // Si el registro fue exitoso, activamos al maestro en la tabla 'maestros'
+    if (response.user != null) {
+      await client
+          .from('maestros')
+          .update({'activo': true})
+          .eq('email', email.toLowerCase().trim());
+    }
+    
     return response;
   }
 
@@ -107,7 +129,7 @@ class SupabaseService {
   }
 
   // Groups
-  Future<List<Grupo>> getMaestroGrupos(int maestroId) async {
+  Future<List<Grupo>> getMaestroGrupos(String maestroId) async {
     var query = client
         .from('grupos')
         .select('*, cursos(curso)')
@@ -132,28 +154,28 @@ class SupabaseService {
     return (response as List).map((e) => e['numero'].toString()).toList();
   }
 
-  // Students in Group
+  // Students in Group - uses two-step query to avoid RLS join issues
   Future<List<Alumno>> getGrupoAlumnos(String grupoClave) async {
-    var query = client
+    // Step 1: get alumno IDs from alumno_grupos
+    final inscripcionesResponse = await client
         .from('alumno_grupos')
-        .select('alumnos(*)')
+        .select('alumno_id')
         .eq('grupo_clave', grupoClave)
         .eq('estado', 'Activo');
 
-    final response = await query;
+    final List<String> alumnoIds = (inscripcionesResponse as List)
+        .map((e) => e['alumno_id'].toString())
+        .toList();
 
-    final List<Alumno> alumnos = [];
-    final Set<int> added = {};
-    for (var json in response as List) {
-      if (json['alumnos'] != null) {
-        final a = Alumno.fromJson(json);
-        if (!added.contains(a.id)) {
-          added.add(a.id);
-          alumnos.add(a);
-        }
-      }
-    }
-    return alumnos;
+    if (alumnoIds.isEmpty) return [];
+
+    // Step 2: get alumno details separately (NO organizacion_id filter - alumnos pertenecen al maestro via alumno_grupos)
+    final result = await client
+        .from('alumnos')
+        .select('id, nombre, credencial, email')
+        .inFilter('id', alumnoIds);
+
+    return (result as List).map((json) => Alumno.fromJson(json)).toList();
   }
 
   // Sessions
@@ -190,15 +212,27 @@ class SupabaseService {
   }
 
   Future<bool> checkSalonAvailability(String salonId, String fecha, String hora) async {
-    final response = await client.rpc(
-      'check_salon_disponible',
-      params: {
-        'p_salon': salonId,
-        'p_fecha': fecha,
-        'p_hora_inicio': hora,
-      },
-    );
-    return response as bool;
+    try {
+      final response = await client.rpc(
+        'check_salon_examen_disponible',
+        params: {
+          'p_salon': salonId,
+          'p_fecha': fecha,
+          'p_hora': hora,
+          'p_excluir_clave': '',
+        },
+      );
+      // La función puede devolver bool directamente o un Map con el resultado
+      if (response is bool) return response;
+      if (response is Map) {
+        final val = response.values.firstOrNull;
+        return val == true || val == 1;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Check salon error: $e');
+      return true; // Si falla, no bloquear al maestro
+    }
   }
 
   // Attendance
@@ -222,7 +256,7 @@ class SupabaseService {
   // ============================================================
 
   /// Devuelve los exámenes donde el maestro es base, examinador1 o examinador2
-  Future<List<ExamenProgramado>> getExamenesMaestro(int maestroId) async {
+  Future<List<ExamenProgramado>> getExamenesMaestro(String maestroId) async {
     var query = client
         .from('programacion_examenes')
         .select('''
@@ -272,7 +306,7 @@ class SupabaseService {
   }
 
   /// Obtiene la clave de acceso de un examen (solo si el maestro es base)
-  Future<String?> obtenerClaveAcceso(String claveExamen, int maestroId) async {
+  Future<String?> obtenerClaveAcceso(String claveExamen, String maestroId) async {
     var query = client
         .from('programacion_examenes')
         .select('clave_acceso')
@@ -315,20 +349,17 @@ class SupabaseService {
         .eq('grupo_clave', grupoClave)
         .eq('estado', 'Activo');
 
-    final List<int> alumnoIds = (response as List)
-        .map((e) => e['alumno_id'] as int)
+    final List<String> alumnoIds = (response as List)
+        .map((e) => e['alumno_id'].toString())
         .toList();
 
     if (alumnoIds.isEmpty) return [];
 
-    var queryAlumnos = client
+    // No filtrar por activo ni organizacion_id - si están en alumno_grupos, son alumnos válidos
+    final result = await client
         .from('alumnos')
         .select('id, nombre, credencial')
-        .inFilter('id', alumnoIds)
-        .eq('activo', true);
-    if (_organizacionId != null) queryAlumnos = queryAlumnos.eq('organizacion_id', _organizacionId!);
-
-    final result = await queryAlumnos;
+        .inFilter('id', alumnoIds);
 
     return (result as List).map((e) => e as Map<String, dynamic>).toList();
   }
@@ -345,13 +376,12 @@ class SupabaseService {
   /// Guarda los resultados de un examen en resultados_examen
   Future<void> guardarResultadosExamen({
     required String claveExamen,
-    required int maestroCalificadorId,
+    required String maestroCalificadorId,
     required String credencialMaestro,
     required List<ResultadoExamen> resultados,
   }) async {
-    final ahora = DateTime.now().toUtc().toIso8601String();
     final data = resultados.map((r) {
-      final json = {
+      final Map<String, dynamic> json = {
         'clave_examen': claveExamen,
         'alumno_id': r.alumnoId,
         'presento': r.presento,
@@ -360,7 +390,7 @@ class SupabaseService {
         'nota': r.nota,
         'maestro_calificador_id': maestroCalificadorId,
         'credencial_maestro': credencialMaestro,
-        'hora_calificacion': ahora,
+        'hora_calificacion': '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}:00',
       };
       if (_organizacionId != null) {
         json['organizacion_id'] = _organizacionId!;

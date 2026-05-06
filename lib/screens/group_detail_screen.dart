@@ -15,8 +15,8 @@ class GroupDetailScreen extends StatefulWidget {
 }
 
 class _GroupDetailScreenState extends State<GroupDetailScreen> {
-  final Map<int, EstadoAsistencia> _attendance = {};
-  final Map<int, String> _observaciones = {};
+  final Map<String, EstadoAsistencia> _attendance = {};
+  final Map<String, String> _observaciones = {};
   bool _classStarted = false;
   String _sessionDate = DateTime.now().toIso8601String().split('T')[0];
   int _sesionesCount = 0;
@@ -121,7 +121,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       ),
                       DropdownButtonFormField<String>(
                         decoration: const InputDecoration(labelText: 'Salón'),
-                        value: provider.salones.contains(salonExtra) ? salonExtra : (provider.salones.isNotEmpty ? provider.salones.first : null),
+                        initialValue: provider.salones.contains(salonExtra) ? salonExtra : (provider.salones.isNotEmpty ? provider.salones.first : null),
                         items: provider.salones.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                         onChanged: (v) {
                           if (v != null) {
@@ -168,14 +168,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
-  void _submitSession(Grupo grupo, int maestroId, DateTime date, TimeOfDay time, bool esExtra, String? motivo, String? salon) async {
+  void _submitSession(Grupo grupo, String maestroId, DateTime date, TimeOfDay time, bool esExtra, String? motivo, String? salon) async {
     final combined = DateTime(date.year, date.month, date.day, time.hour, time.minute);
     
     final sesion = Sesion(
       grupoId: grupo.id,
       maestroId: maestroId,
       fecha: combined.toIso8601String().split('T')[0],
-      horaInicio: combined.toUtc().toIso8601String(),
+      horaInicio: '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:00',
       esExtra: esExtra,
       motivoExtra: motivo,
       salonExtra: salon,

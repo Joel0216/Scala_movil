@@ -8,9 +8,9 @@ class ExamenProgramado {
   final String? hora;
   final String? salon;
   final String? claveAcceso;
-  final int? maestroBaseId;
-  final int? examinador1Id;
-  final int? examinador2Id;
+  final String? maestroBaseId;
+  final String? examinador1Id;
+  final String? examinador2Id;
   final String? maestroBaseNombre;
   final String? examinador1Nombre;
   final String? examinador2Nombre;
@@ -48,9 +48,9 @@ class ExamenProgramado {
       hora: json['hora'],
       salon: json['salon_id']?.toString(),
       claveAcceso: json['clave_acceso'],
-      maestroBaseId: json['maestro_base_id'],
-      examinador1Id: json['examinador1_id'],
-      examinador2Id: json['examinador2_id'],
+      maestroBaseId: json['maestro_base_id']?.toString(),
+      examinador1Id: json['examinador1_id']?.toString(),
+      examinador2Id: json['examinador2_id']?.toString(),
       maestroBaseNombre: mb?['nombre'],
       examinador1Nombre: e1?['nombre'],
       examinador2Nombre: e2?['nombre'],
@@ -59,7 +59,7 @@ class ExamenProgramado {
 }
 
 class ResultadoExamen {
-  final int? alumnoId;
+  final String? alumnoId;
   final String? credencial;
   final String? nombreAlumno;
   bool presento;

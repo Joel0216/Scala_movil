@@ -3,7 +3,7 @@ enum EstadoAsistencia { asistencia, falta, retardo, reposicion }
 class Asistencia {
   final int? id;
   final String grupoId;
-  final int alumnoId;
+  final String alumnoId;
   final String fecha;
   final EstadoAsistencia estado;
   final String? observaciones;
@@ -38,6 +38,7 @@ class Asistencia {
       'alumno_id': alumnoId,
       'fecha': fecha,
       'asistio': estado != EstadoAsistencia.falta, // Reposición cuenta como asistencia
+      'estatus': estado == EstadoAsistencia.falta ? 'Faltó' : 'Asistió',
       'observaciones': finalObservaciones,
     };
   }

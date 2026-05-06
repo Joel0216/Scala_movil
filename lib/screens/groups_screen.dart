@@ -5,7 +5,6 @@ import '../providers/data_provider.dart';
 import '../models/grupo.dart';
 import '../models/examen_programado.dart';
 import 'group_detail_screen.dart';
-import 'exam_screen.dart';
 
 class GroupsScreen extends StatefulWidget {
   const GroupsScreen({super.key});
@@ -269,7 +268,7 @@ class _ExamenesTabState extends State<ExamenesTab> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
-    final maestroId = auth.maestro?.id ?? 0;
+    final maestroId = auth.maestro?.id ?? '';
     
     final active = data.examenes.where((e) => !data.hiddenIds.contains('e_${e.claveExamen}')).toList();
     final hidden = data.examenes.where((e) => data.hiddenIds.contains('e_${e.claveExamen}')).toList();
@@ -342,7 +341,7 @@ class _ExamenesTabState extends State<ExamenesTab> {
     );
   }
 
-  Future<void> _ingresarConClave(BuildContext ctx, int maestroId, String maestroClave) async {
+  Future<void> _ingresarConClave(BuildContext ctx, String maestroId, String maestroClave) async {
     final controller = TextEditingController();
     final clave = await showDialog<String>(
       context: ctx,
@@ -389,7 +388,7 @@ class _ExamenesTabState extends State<ExamenesTab> {
 
 class _ExamenCard extends StatefulWidget {
   final ExamenProgramado examen;
-  final int maestroId;
+  final String maestroId;
   final String maestroClave;
 
   const _ExamenCard({required this.examen, required this.maestroId, required this.maestroClave});
@@ -400,14 +399,10 @@ class _ExamenCard extends StatefulWidget {
 
 class _ExamenCardState extends State<_ExamenCard> {
   bool _esMaestroBase = false;
-  bool _esExaminador = false;
-
   @override
   void initState() {
     super.initState();
     _esMaestroBase = widget.examen.maestroBaseId == widget.maestroId;
-    _esExaminador = widget.examen.examinador1Id == widget.maestroId ||
-        widget.examen.examinador2Id == widget.maestroId;
   }
 
   Future<void> _entrarComoBase(BuildContext ctx) async {
@@ -417,20 +412,38 @@ class _ExamenCardState extends State<_ExamenCard> {
           const SnackBar(content: Text('No se encontró la clave de acceso'), backgroundColor: Colors.red));
       return;
     }
+    final timeController = TextEditingController(text: '120');
     final ok = await showDialog<bool>(
       context: ctx,
       builder: (c) => AlertDialog(
-        title: const Text('🔑 Tu Clave de Acceso'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green)),
-            child: Text(clave, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 6, fontFamily: 'monospace')),
-          ),
-          const SizedBox(height: 10),
-          const Text('Esta clave es tuya como maestro base.\nCompártela únicamente si no puedes aplicar el examen.',
-              textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey)),
-        ]),
+        title: const Text('🚀 Iniciar Examen'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🔑 Tu Clave de Acceso', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green)),
+              child: Text(clave, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 6, fontFamily: 'monospace')),
+            ),
+            const SizedBox(height: 20),
+            const Text('⏱️ Duración del Examen', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: timeController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Minutos',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.timer),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text('Compártela clave únicamente si no puedes aplicar el examen.',
+                textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: Colors.grey)),
+          ],
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
           ElevatedButton(
@@ -441,48 +454,18 @@ class _ExamenCardState extends State<_ExamenCard> {
         ],
       ),
     );
-    if (ok == true && ctx.mounted) _navigateToExamen(ctx);
-  }
-
-  Future<void> _entrarComoExaminador(BuildContext ctx) async {
-    final controller = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: ctx,
-      builder: (c) => AlertDialog(
-        title: const Text('🔑 Ingresa la Clave del Examen'),
-        content: TextField(
-          controller: controller,
-          textCapitalization: TextCapitalization.characters,
-          maxLength: 6,
-          decoration: const InputDecoration(labelText: 'Clave de acceso', border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(c, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
-            child: const Text('Verificar', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !ctx.mounted) return;
-    final valida = await ctx.read<DataProvider>()
-        .verificarClaveAcceso(widget.examen.claveExamen, controller.text.trim().toUpperCase());
-    if (!ctx.mounted) return;
-    if (!valida) {
-      ScaffoldMessenger.of(ctx).showSnackBar(
-          const SnackBar(content: Text('❌ Clave incorrecta'), backgroundColor: Colors.red));
-      return;
+    if (ok == true && ctx.mounted) {
+      final mins = int.tryParse(timeController.text) ?? 120;
+      _navigateToExamen(ctx, mins);
     }
-    _navigateToExamen(ctx);
   }
 
-  void _navigateToExamen(BuildContext ctx) {
+  void _navigateToExamen(BuildContext ctx, int duracion) {
     Navigator.pushNamed(ctx, '/exam-session', arguments: {
       'examen': widget.examen,
       'maestroId': widget.maestroId,
       'maestroClave': widget.maestroClave,
+      'duracionMinutos': duracion,
     });
   }
 

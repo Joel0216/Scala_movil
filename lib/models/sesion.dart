@@ -1,7 +1,7 @@
 class Sesion {
   final int? id;
   final String grupoId;
-  final int maestroId;
+  final String maestroId;
   final String fecha;
   final String horaInicio;
   final bool esExtra;

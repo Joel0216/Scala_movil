@@ -1,5 +1,5 @@
 class Maestro {
-  final int id;
+  final String id;
   final String nombre;
   final String email;
   final String? clave;
@@ -15,7 +15,7 @@ class Maestro {
 
   factory Maestro.fromJson(Map<String, dynamic> json) {
     return Maestro(
-      id: json['id'],
+      id: json['id'].toString(),
       nombre: json['nombre'],
       email: json['email'],
       clave: json['clave']?.toString(),

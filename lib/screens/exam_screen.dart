@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -31,7 +32,7 @@ class _ExamScreenState extends State<ExamScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
-    final maestroId = auth.maestro?.id ?? 0;
+    final maestroId = auth.maestro?.id ?? '';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F6F0),
@@ -85,7 +86,7 @@ class _ExamScreenState extends State<ExamScreen> {
 // ============================================================
 class _ExamenCard extends StatefulWidget {
   final ExamenProgramado examen;
-  final int maestroId;
+  final String maestroId;
   final String maestroClave;
 
   const _ExamenCard({required this.examen, required this.maestroId, required this.maestroClave});
@@ -131,7 +132,7 @@ class _ExamenCardState extends State<_ExamenCard> {
       decoration: BoxDecoration(
         color: _cardColor,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -223,7 +224,7 @@ class _ExamenCardState extends State<_ExamenCard> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
       child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
     );
   }
@@ -254,17 +255,32 @@ class _ExamenCardState extends State<_ExamenCard> {
       return;
     }
 
+    final timeController = TextEditingController(text: '120');
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('🔑 Tu Clave de Acceso'),
+        title: const Text('🚀 Iniciar Examen'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Text('🔑 Tu Clave de Acceso', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green)),
               child: Text(clave, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 6, fontFamily: 'monospace')),
+            ),
+            const SizedBox(height: 20),
+            const Text('⏱️ Duración del Examen', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: timeController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Minutos',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.timer),
+              ),
             ),
             const SizedBox(height: 12),
             const Text('Esta clave es confidencial. Compártela solo si no puedes dar el examen.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey)),
@@ -281,11 +297,14 @@ class _ExamenCardState extends State<_ExamenCard> {
       ),
     );
 
+
     if (confirmed == true && mounted) {
+      final mins = int.tryParse(timeController.text) ?? 120;
       Navigator.pushNamed(context, '/exam-session', arguments: {
         'examen': widget.examen,
         'maestroId': widget.maestroId,
         'maestroClave': widget.maestroClave,
+        'duracionMinutos': mins,
       });
     }
   }
@@ -293,6 +312,7 @@ class _ExamenCardState extends State<_ExamenCard> {
   // Examinador: pide clave del maestro base
   Future<void> _supervisarExamen(BuildContext context) async {
     final controller = TextEditingController();
+    final timeController = TextEditingController(text: '120');
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -307,6 +327,18 @@ class _ExamenCardState extends State<_ExamenCard> {
               decoration: const InputDecoration(labelText: 'Clave de acceso', border: OutlineInputBorder()),
               textCapitalization: TextCapitalization.characters,
               maxLength: 6,
+            ),
+            const SizedBox(height: 20),
+            const Text('⏱️ Duración del Examen', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: timeController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Minutos',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.timer),
+              ),
             ),
           ],
         ),
@@ -333,10 +365,12 @@ class _ExamenCardState extends State<_ExamenCard> {
       return;
     }
 
+    final mins = int.tryParse(timeController.text) ?? 120;
     Navigator.pushNamed(context, '/exam-session', arguments: {
       'examen': widget.examen,
       'maestroId': widget.maestroId,
       'maestroClave': widget.maestroClave,
+      'duracionMinutos': mins,
     });
   }
 }
@@ -353,10 +387,11 @@ class ExamSessionScreen extends StatefulWidget {
 
 class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindingObserver {
   Timer? _timer;
-  int _secondsLeft = 2 * 60 * 60; // 2 horas
+  int _secondsLeft = 120 * 60; // Por defecto 2 horas
+  bool _timerInitialized = false;
   List<Map<String, dynamic>> _alumnos = [];
-  final Map<int, ResultadoExamen> _resultados = {};
-  final Map<int, bool> _yaCalificado = {};
+  final Map<String, ResultadoExamen> _resultados = {};
+  final Map<String, bool> _yaCalificado = {};
   bool _loading = true;
   bool _guardando = false;
   bool _hayCambios = false;
@@ -375,11 +410,25 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
   bool _isNotificationsInitialized = false;
 
   void _initNotifications() async {
+    // 1. Definimos los ajustes de inicialización para Android e iOS
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+    );
+
     try {
-      const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
-      const settings = InitializationSettings(android: androidSettings);
-      await flutterLocalNotificationsPlugin.initialize(settings);
-      _isNotificationsInitialized = true;
+      // 2. Inicializamos solo si no estamos en Web. Usamos 'as dynamic' para evitar que el compilador de Chrome falle por la firma del plugin
+      if (!kIsWeb) {
+        await (flutterLocalNotificationsPlugin as dynamic).initialize(
+          initializationSettings,
+          onDidReceiveNotificationResponse: (NotificationResponse details) {
+            // Manejo de la notificación
+          },
+        );
+        _isNotificationsInitialized = true;
+      }
     } catch (e) {
       debugPrint('Error inicializando notificaciones: $e');
     }
@@ -408,10 +457,12 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
       _showNotification();
     } else if (state == AppLifecycleState.resumed) {
       // Cancelar notificacion y recalcular timer
-      try {
-        flutterLocalNotificationsPlugin.cancelAll();
-      } catch (e) {
-        debugPrint('Error al cancelar notificaciones: $e');
+      if (_isNotificationsInitialized) {
+        try {
+          flutterLocalNotificationsPlugin.cancelAll();
+        } catch (e) {
+          debugPrint('Error al cancelar notificaciones: $e');
+        }
       }
       _syncTimer();
     }
@@ -460,6 +511,9 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
       } else {
         if (mounted) setState(() => _secondsLeft = 0);
       }
+    } else {
+      final duracionMinutos = args['duracionMinutos'] as int? ?? 120;
+      if (mounted) setState(() => _secondsLeft = duracionMinutos * 60);
     }
   }
 
@@ -480,12 +534,12 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
     setState(() {
       _alumnos = alumnos;
       
-      final Map<int, Map<String, dynamic>> resMap = {
-        for (var e in resultadosViejos) e['alumno_id'] as int: e
+      final Map<String, Map<String, dynamic>> resMap = {
+        for (var e in resultadosViejos) e['alumno_id'].toString(): e
       };
       
       for (final a in alumnos) {
-        final id = a['id'] as int;
+        final id = a['id'].toString();
         
         // Revisar si ya tiene calificación guardada y SI PRESENTÓ
         final rv = resMap[id];
@@ -511,7 +565,7 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
           );
         }
       }
-      _isFinished = _alumnos.isNotEmpty && _alumnos.every((a) => _yaCalificado[a['id']] == true);
+      _isFinished = _alumnos.isNotEmpty && _alumnos.every((a) => _yaCalificado[a['id'].toString()] == true);
       _loading = false;
     });
     
@@ -527,17 +581,24 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
     final prefs = await SharedPreferences.getInstance();
     
     if (!prefs.containsKey('exam_end_${examen.claveExamen}')) {
-      final endTime = DateTime.now().add(Duration(seconds: _secondsLeft));
+      final duracionMinutos = args['duracionMinutos'] as int? ?? 120;
+      final endTime = DateTime.now().add(Duration(minutes: duracionMinutos));
       await prefs.setString('exam_end_${examen.claveExamen}', endTime.toIso8601String());
     }
 
+    // Read the stored end time so we can always compute from real clock
+    final endTimeStr = prefs.getString('exam_end_${examen.claveExamen}')!;
+    final endTime = DateTime.parse(endTimeStr);
+
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (_secondsLeft <= 0) {
+      final remaining = endTime.difference(DateTime.now()).inSeconds;
+      if (remaining <= 0) {
         t.cancel();
+        if (mounted) setState(() => _secondsLeft = 0);
         _onTimerEnd();
       } else {
-        setState(() => _secondsLeft--);
+        if (mounted) setState(() => _secondsLeft = remaining);
       }
     });
   }
@@ -564,7 +625,7 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
   Future<void> _guardarResultados() async {
     final args = ModalRoute.of(context)!.settings.arguments as Map;
     final examen = args['examen'] as ExamenProgramado;
-    final maestroId = args['maestroId'] as int;
+    final maestroId = args['maestroId'] as String;
     final maestroClave = args['maestroClave'] as String;
 
     setState(() => _guardando = true);
@@ -601,7 +662,7 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)!.settings.arguments as Map;
     final examen = args['examen'] as ExamenProgramado;
-    final todosCalificados = _alumnos.isNotEmpty && _alumnos.every((a) => _yaCalificado[a['id']] == true);
+    final todosCalificados = _alumnos.isNotEmpty && _alumnos.every((a) => _yaCalificado[a['id'].toString()] == true);
 
     return PopScope(
       canPop: !_hayCambios,
@@ -625,7 +686,7 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
                     child: Column(
                       children: [
                         Text('TIEMPO RESTANTE',
-                            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11, letterSpacing: 2)),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11, letterSpacing: 2)),
                         const SizedBox(height: 4),
                         Text(_timerDisplay,
                             style: TextStyle(color: _timerColor, fontSize: 40, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
@@ -643,7 +704,6 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
                       child: Row(
                         children: [
                           Expanded(child: Text('Grupo: ${examen.grupoNombre ?? "—"}', style: const TextStyle(fontWeight: FontWeight.bold))),
-                          Expanded(child: Text('Tipo: ${examen.tipo ?? "—"}')),
                           Expanded(child: Text('Hora: ${examen.hora ?? "—"}')),
                         ],
                       ),
@@ -659,7 +719,7 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
                           itemCount: _alumnos.length,
                           itemBuilder: (ctx, i) {
                             final alumno = _alumnos[i];
-                            final id = alumno['id'] as int;
+                            final id = alumno['id'].toString();
                             final resultado = _resultados[id]!;
                             final yaCalificado = _yaCalificado[id] ?? false;
                             return _buildAlumnoTile(alumno, resultado, yaCalificado);
@@ -791,7 +851,7 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> with WidgetsBindi
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: isActive ? Colors.green.withOpacity(0.15) : Colors.grey.withOpacity(0.1),
+        color: isActive ? Colors.green.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: isActive ? Colors.green : Colors.grey.shade300),
       ),
